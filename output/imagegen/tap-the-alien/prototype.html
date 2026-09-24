@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#080d28">
+  <title>Tap the Alien — Prototype</title>
+  <style>
+    :root { color-scheme: dark; font-family: ui-rounded, "Arial Rounded MT Bold", system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; }
+    body { overflow: hidden; background: #080d28; color: #fff; }
+    button { font: inherit; }
+    .game {
+      position: relative;
+      width: 100%;
+      height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
+      isolation: isolate;
+      background: #080d28 url("./space-background.png") center / cover no-repeat;
+      touch-action: manipulation;
+    }
+    .game::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      background: linear-gradient(180deg, rgba(3, 5, 25, .35), transparent 22%, transparent 72%, rgba(3, 5, 25, .42));
+    }
+    .hud {
+      position: absolute;
+      z-index: 3;
+      top: max(18px, env(safe-area-inset-top));
+      left: 16px;
+      right: 16px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      pointer-events: none;
+    }
+    .stat {
+      min-width: 92px;
+      padding: 10px 16px;
+      border: 1px solid rgba(176, 226, 255, .34);
+      border-radius: 18px;
+      background: rgba(5, 10, 36, .64);
+      box-shadow: 0 8px 26px rgba(0, 0, 0, .22);
+      backdrop-filter: blur(12px);
+      text-align: center;
+    }
+    .stat-label { display: block; color: #b9d5f6; font-size: 10px; font-weight: 800; letter-spacing: .15em; text-transform: uppercase; }
+    .stat-value { display: block; margin-top: 2px; font-size: clamp(24px, 7vw, 34px); font-weight: 900; line-height: 1.1; font-variant-numeric: tabular-nums; }
+    .timer-low .stat-value { color: #ffb3ca; }
+    .playfield {
+      position: absolute;
+      inset: clamp(108px, 17vh, 150px) 0 max(36px, env(safe-area-inset-bottom)) 0;
+    }
+    .alien {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: clamp(92px, 31vw, 150px);
+      aspect-ratio: 1149 / 1369;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      cursor: pointer;
+      transform: translate(-50%, -50%);
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      user-select: none;
+      filter: drop-shadow(0 10px 12px rgba(0, 0, 0, .45));
+    }
+    .alien img { width: 100%; height: 100%; display: block; pointer-events: none; -webkit-user-drag: none; }
+    .alien:focus-visible { outline: 3px solid #b8fff0; outline-offset: 7px; border-radius: 40%; }
+    .alien[hidden] { display: none; }
+    .alien.pop { animation: pop .2s ease-out; }
+    @keyframes pop { 50% { scale: 1.11; } }
+    .toast {
+      position: absolute;
+      z-index: 2;
+      left: 50%;
+      top: 36%;
+      color: #baffec;
+      font-size: 30px;
+      font-weight: 900;
+      text-shadow: 0 2px 12px #0b1846;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .toast.show { animation: score-burst .55s ease-out; }
+    @keyframes score-burst { from { opacity: 1; transform: translate(-50%, 10px) scale(.7); } to { opacity: 0; transform: translate(-50%, -45px) scale(1.15); } }
+    .overlay {
+      position: absolute;
+      z-index: 5;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background: rgba(3, 7, 27, .52);
+      backdrop-filter: blur(5px);
+    }
+    .overlay[hidden] { display: none; }
+    .card {
+      width: min(100%, 390px);
+      padding: 30px 25px;
+      border: 1px solid rgba(174, 231, 255, .38);
+      border-radius: 28px;
+      background: linear-gradient(155deg, rgba(22, 37, 86, .96), rgba(10, 14, 49, .96));
+      box-shadow: 0 24px 70px rgba(0, 0, 0, .45);
+      text-align: center;
+    }
+    .card.achievement-unlocked {
+      border-color: rgba(186, 255, 222, .85);
+      box-shadow: 0 0 42px rgba(119, 255, 202, .25), 0 24px 70px rgba(0, 0, 0, .45);
+    }
+    .achievement {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin: 2px auto 0;
+      padding: 8px 13px;
+      border: 1px solid rgba(186, 255, 222, .65);
+      border-radius: 999px;
+      background: rgba(73, 194, 157, .22);
+      color: #c8ffde;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: .11em;
+      text-transform: uppercase;
+      animation: achievement-pop .45s ease-out both;
+    }
+    .achievement[hidden] { display: none; }
+    .achievement span { color: #ffe68a; font-size: 17px; line-height: 1; }
+    @keyframes achievement-pop { from { opacity: 0; transform: scale(.75); } to { opacity: 1; transform: scale(1); } }
+    .eyebrow { margin: 0 0 10px; color: #a9fff0; font-size: 11px; font-weight: 900; letter-spacing: .18em; text-transform: uppercase; }
+    h1 { margin: 0; font-size: clamp(36px, 10vw, 48px); line-height: 1.02; letter-spacing: -.045em; }
+    .description { margin: 17px auto 24px; max-width: 27ch; color: #dce9ff; font-size: 16px; line-height: 1.5; }
+    .final-score { margin: 16px 0 22px; color: #baffec; font-size: 46px; font-weight: 900; line-height: 1; }
+    .final-score small { display: block; margin-bottom: 7px; color: #c4d4ef; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
+    .primary {
+      width: 100%;
+      min-height: 56px;
+      border: 0;
+      border-radius: 16px;
+      background: #b7ffec;
+      color: #062a37;
+      font-size: 17px;
+      font-weight: 900;
+      cursor: pointer;
+      box-shadow: 0 7px 0 #70cbbb, 0 14px 24px rgba(0, 0, 0, .22);
+    }
+    .primary:active { transform: translateY(4px); box-shadow: 0 3px 0 #70cbbb; }
+    .primary:focus-visible { outline: 3px solid white; outline-offset: 4px; }
+    @media (prefers-reduced-motion: reduce) { .alien.pop, .toast.show, .achievement { animation: none; } }
+  </style>
+</head>
+<body>
+  <main class="game" aria-label="Tap the Alien game">
+    <div class="hud" aria-live="off">
+      <div class="stat"><span class="stat-label">Score</span><span class="stat-value" id="score">0</span></div>
+      <div class="stat" id="timer-stat"><span class="stat-label">Time</span><span class="stat-value" id="time">30</span></div>
+    </div>
+    <div class="playfield" id="playfield">
+      <button class="alien" id="alien" type="button" aria-label="Tap the alien" hidden>
+        <img src="./alien-character.png" alt="" draggable="false">
+      </button>
+      <span class="toast" id="toast" aria-hidden="true">+1</span>
+    </div>
+    <section class="overlay" id="overlay" aria-labelledby="overlay-title">
+      <div class="card" id="card">
+        <p class="eyebrow">Playable prototype</p>
+        <h1 id="overlay-title">Tap the<br>Alien</h1>
+        <p class="description" id="overlay-description">Catch the alien as many times as you can in 30 seconds. It moves around, so be quick!</p>
+        <div class="achievement" id="achievement" hidden><span aria-hidden="true">✦</span> Cosmic Catcher unlocked</div>
+        <div class="final-score" id="final-score" hidden><small>Final score</small><span id="final-number">0</span></div>
+        <button class="primary" id="start" type="button">Start game</button>
+      </div>
+    </section>
+  </main>
+  <script>
+    // Prototype question: does a moving target with a 30-second round feel fun on a phone?
+    // Game state is kept here so the timing and scoring rules are easy to lift later.
+    const ROUND_MS = 30_000;
+    const MOVE_MS = 900;
+    const initialState = () => ({ phase: "ready", score: 0, remainingMs: ROUND_MS });
+    const transition = (state, action) => {
+      if (action.type === "START") return { phase: "playing", score: 0, remainingMs: ROUND_MS };
+      if (state.phase !== "playing") return state;
+      if (action.type === "TICK") {
+        const remainingMs = Math.max(0, action.remainingMs);
+        return { ...state, remainingMs, phase: remainingMs === 0 ? "finished" : "playing" };
+      }
+      if (action.type === "CATCH" && state.remainingMs > 0) return { ...state, score: state.score + 1 };
+      return state;
+    };
+
+    const field = document.getElementById("playfield");
+    const alien = document.getElementById("alien");
+    const score = document.getElementById("score");
+    const time = document.getElementById("time");
+    const timerStat = document.getElementById("timer-stat");
+    const overlay = document.getElementById("overlay");
+    const card = document.getElementById("card");
+    const title = document.getElementById("overlay-title");
+    const description = document.getElementById("overlay-description");
+    const achievement = document.getElementById("achievement");
+    const finalScore = document.getElementById("final-score");
+    const finalNumber = document.getElementById("final-number");
+    const startButton = document.getElementById("start");
+    const toast = document.getElementById("toast");
+    let state = initialState();
+    let endAt = 0;
+    let moveTimer = 0;
+    let frame = 0;
+    let toastTimer = 0;
+
+    function render() {
+      score.textContent = state.score;
+      time.textContent = Math.ceil(state.remainingMs / 1000);
+      timerStat.classList.toggle("timer-low", state.phase === "playing" && state.remainingMs <= 5_000);
+      alien.hidden = state.phase !== "playing";
+      overlay.hidden = state.phase === "playing";
+      if (state.phase === "finished") {
+        const unlocked = state.score >= 2;
+        title.textContent = unlocked ? "Achievement unlocked!" : "Time's up!";
+        description.textContent = unlocked
+          ? "You caught at least two aliens. The galaxy noticed!"
+          : "Nice catching. Ready for another round?";
+        achievement.hidden = !unlocked;
+        card.classList.toggle("achievement-unlocked", unlocked);
+        finalNumber.textContent = state.score;
+        finalScore.hidden = false;
+        startButton.textContent = "Play again";
+      }
+    }
+
+    function moveAlien() {
+      if (state.phase !== "playing") return;
+      const bounds = field.getBoundingClientRect();
+      const target = alien.getBoundingClientRect();
+      const margin = 12;
+      const halfWidth = target.width / 2;
+      const halfHeight = target.height / 2;
+      const minX = halfWidth + margin;
+      const maxX = Math.max(minX, bounds.width - halfWidth - margin);
+      const minY = halfHeight + margin;
+      const maxY = Math.max(minY, bounds.height - halfHeight - margin);
+      alien.style.left = `${minX + Math.random() * (maxX - minX)}px`;
+      alien.style.top = `${minY + Math.random() * (maxY - minY)}px`;
+    }
+
+    function finish() {
+      state = transition(state, { type: "TICK", remainingMs: 0 });
+      clearInterval(moveTimer);
+      cancelAnimationFrame(frame);
+      render();
+      startButton.focus();
+    }
+
+    function tick() {
+      if (state.phase !== "playing") return;
+      const remainingMs = Math.max(0, endAt - performance.now());
+      if (remainingMs <= 0) return finish();
+      state = transition(state, { type: "TICK", remainingMs });
+      render();
+      frame = requestAnimationFrame(tick);
+    }
+
+    function start() {
+      clearInterval(moveTimer);
+      cancelAnimationFrame(frame);
+      state = transition(state, { type: "START" });
+      endAt = performance.now() + ROUND_MS;
+      render();
+      moveAlien();
+      moveTimer = setInterval(moveAlien, MOVE_MS);
+      frame = requestAnimationFrame(tick);
+    }
+
+    startButton.addEventListener("click", start);
+    alien.addEventListener("click", () => {
+      if (state.phase !== "playing") return;
+      if (performance.now() >= endAt) return finish();
+      state = transition(state, { type: "CATCH" });
+      render();
+      toast.style.left = alien.style.left;
+      toast.style.top = alien.style.top;
+      toast.classList.remove("show");
+      void toast.offsetWidth;
+      toast.classList.add("show");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove("show"), 550);
+      alien.classList.remove("pop");
+      void alien.offsetWidth;
+      alien.classList.add("pop");
+      moveAlien();
+    });
+    window.addEventListener("resize", moveAlien);
+    render();
+  </script>
+</body>
+</html>
